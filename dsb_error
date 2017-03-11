@@ -1,0 +1,316 @@
+from __future__ import print_function
+import os
+import sys
+import pickle
+import traceback
+import pandas as pd
+import numpy as np
+import scipy.misc
+from sklearn.preprocessing import LabelEncoder
+from keras import backend as K
+K.set_image_dim_ordering('tf')
+from keras.models import load_model
+keras_backend = 'tensorflow'
+import tensorflow as tf
+In [25]:
+
+def limit_mem():
+    cfg = K.tf.ConfigProto()
+    cfg.gpu_options.allow_growth = True
+    K.set_session(K.tf.Session(config=cfg))
+In [26]:
+
+limit_mem()
+In [8]:
+
+path='/home/renjith/datascience/kaggle/input/dsb/kaggle_preprocessed_output/stage1/'
+test_file='stage1_sample_submission.csv'
+In [7]:
+
+with open(path+'mapping.pkl', 'rb') as f:
+    data_mapping = pickle.load(f)
+In [11]:
+
+f
+data_mapping
+Out[11]:
+{'inputs': {'InputPort0': {'details': [{'name': 'id', 'type': 'Numpy'}],
+   'size': 1}},
+ 'outputs': {'OutputPort0': {'details': [{'categories': array([0, 1]),
+     'name': 'cancer',
+     'type': 'Categorical'}],
+   'size': 2}}}
+In [9]:
+
+test_raw = pd.read_csv(path+test_file)
+In [12]:
+
+test_data = []
+le = None
+inp_port = data_mapping['inputs']['InputPort'+str(0)]
+col_name = inp_port['details'][0]['name']
+In [14]:
+
+col_name
+col_name
+Out[14]:
+'id'
+In [13]:
+
+test_data.append(np.ndarray((198, 256, 512, 512, 1), dtype = np.float32))
+In [15]:
+
+for j, filename in enumerate(test_raw[col_name]):  # col_name is "id"
+    npzfile = np.load(path+test_raw[col_name][j]+'.npz')
+    x = npzfile[npzfile.files[0]]
+    test_data[0][j] = x
+In [17]:
+
+out_port['details'][0]['type']
+out_port = data_mapping['outputs']['OutputPort0']
+In [19]:
+
+if out_port['details'][0]['type'] == 'Categorical':
+    le = LabelEncoder()
+    le.fit(out_port['details'][0]['categories'])
+In [22]:
+
+model = load_model(path+'model.h5')
+In [24]:
+
+model.summary()
+____________________________________________________________________________________________________
+Layer (type)                     Output Shape          Param #     Connected to                     
+====================================================================================================
+input_1 (InputLayer)             (None, 256, 512, 512, 0                                            
+____________________________________________________________________________________________________
+maxpooling3d_1 (MaxPooling3D)    (None, 256, 170, 170, 0           input_1[0][0]                    
+____________________________________________________________________________________________________
+convolution3d_1 (Convolution3D)  (None, 253, 167, 167, 650         maxpooling3d_1[0][0]             
+____________________________________________________________________________________________________
+convolution3d_2 (Convolution3D)  (None, 250, 164, 164, 6410        convolution3d_1[0][0]            
+____________________________________________________________________________________________________
+batchnormalization_1 (BatchNorma (None, 250, 164, 164, 40          convolution3d_2[0][0]            
+____________________________________________________________________________________________________
+maxpooling3d_2 (MaxPooling3D)    (None, 125, 82, 82, 1 0           batchnormalization_1[0][0]       
+____________________________________________________________________________________________________
+spatialdropout3d_1 (SpatialDropo (None, 125, 82, 82, 1 0           maxpooling3d_2[0][0]             
+____________________________________________________________________________________________________
+convolution3d_3 (Convolution3D)  (None, 124, 81, 81, 2 1620        spatialdropout3d_1[0][0]         
+____________________________________________________________________________________________________
+convolution3d_4 (Convolution3D)  (None, 123, 80, 80, 2 3220        convolution3d_3[0][0]            
+____________________________________________________________________________________________________
+batchnormalization_2 (BatchNorma (None, 123, 80, 80, 2 80          convolution3d_4[0][0]            
+____________________________________________________________________________________________________
+maxpooling3d_3 (MaxPooling3D)    (None, 61, 40, 40, 20 0           batchnormalization_2[0][0]       
+____________________________________________________________________________________________________
+spatialdropout3d_2 (SpatialDropo (None, 61, 40, 40, 20 0           maxpooling3d_3[0][0]             
+____________________________________________________________________________________________________
+convolution3d_5 (Convolution3D)  (None, 60, 39, 39, 40 6440        spatialdropout3d_2[0][0]         
+____________________________________________________________________________________________________
+convolution3d_6 (Convolution3D)  (None, 59, 38, 38, 40 12840       convolution3d_5[0][0]            
+____________________________________________________________________________________________________
+maxpooling3d_4 (MaxPooling3D)    (None, 29, 19, 19, 40 0           convolution3d_6[0][0]            
+____________________________________________________________________________________________________
+batchnormalization_3 (BatchNorma (None, 29, 19, 19, 40 160         maxpooling3d_4[0][0]             
+____________________________________________________________________________________________________
+spatialdropout3d_3 (SpatialDropo (None, 29, 19, 19, 40 0           batchnormalization_3[0][0]       
+____________________________________________________________________________________________________
+globalmaxpooling3d_1 (GlobalMaxP (None, 40)            0           spatialdropout3d_3[0][0]         
+____________________________________________________________________________________________________
+dense_1 (Dense)                  (None, 10)            410         globalmaxpooling3d_1[0][0]       
+____________________________________________________________________________________________________
+dropout_1 (Dropout)              (None, 10)            0           dense_1[0][0]                    
+____________________________________________________________________________________________________
+dense_2 (Dense)                  (None, 10)            110         dropout_1[0][0]                  
+____________________________________________________________________________________________________
+dense_3 (Dense)                  (None, 2)             22          dense_2[0][0]                    
+====================================================================================================
+Total params: 32,002
+Trainable params: 31,862
+Non-trainable params: 140
+____________________________________________________________________________________________________
+In [44]:
+
+test_data
+# test_data is a list of nd-array
+test_data[0].shape
+Out[44]:
+(198, 256, 512, 512, 1)
+In [45]:
+
+, batch_size = 4
+result = model.predict(test_data, batch_size = 4)
+---------------------------------------------------------------------------
+FailedPreconditionError                   Traceback (most recent call last)
+/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/tensorflow/python/client/session.py in _do_call(self, fn, *args)
+   1021     try:
+-> 1022       return fn(*args)
+   1023     except errors.OpError as e:
+
+/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/tensorflow/python/client/session.py in _run_fn(session, feed_dict, fetch_list, target_list, options, run_metadata)
+   1003                                  feed_dict, fetch_list, target_list,
+-> 1004                                  status, run_metadata)
+   1005 
+
+/home/renjith/anaconda2/envs/python3/lib/python3.6/contextlib.py in __exit__(self, type, value, traceback)
+     88             try:
+---> 89                 next(self.gen)
+     90             except StopIteration:
+
+/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/tensorflow/python/framework/errors_impl.py in raise_exception_on_not_ok_status()
+    468           compat.as_text(pywrap_tensorflow.TF_Message(status)),
+--> 469           pywrap_tensorflow.TF_GetCode(status))
+    470   finally:
+
+FailedPreconditionError: Attempting to use uninitialized value convolution3d_1_W
+	 [[Node: convolution3d_1_W/read = Identity[T=DT_FLOAT, _class=["loc:@convolution3d_1_W"], _device="/job:localhost/replica:0/task:0/gpu:0"](convolution3d_1_W)]]
+	 [[Node: moments_2/sufficient_statistics/Gather/_17 = _Recv[client_terminated=false, recv_device="/job:localhost/replica:0/task:0/cpu:0", send_device="/job:localhost/replica:0/task:0/gpu:0", send_device_incarnation=1, tensor_name="edge_83_moments_2/sufficient_statistics/Gather", tensor_type=DT_FLOAT, _device="/job:localhost/replica:0/task:0/cpu:0"]()]]
+
+During handling of the above exception, another exception occurred:
+
+FailedPreconditionError                   Traceback (most recent call last)
+<ipython-input-45-0a10bd03240a> in <module>()
+----> 1 result = model.predict(test_data, batch_size = 4)
+
+/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/keras/engine/training.py in predict(self, x, batch_size, verbose)
+   1270         f = self.predict_function
+   1271         return self._predict_loop(f, ins,
+-> 1272                                   batch_size=batch_size, verbose=verbose)
+   1273 
+   1274     def train_on_batch(self, x, y,
+
+/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/keras/engine/training.py in _predict_loop(self, f, ins, batch_size, verbose)
+    943                 ins_batch = slice_X(ins, batch_ids)
+    944 
+--> 945             batch_outs = f(ins_batch)
+    946             if not isinstance(batch_outs, list):
+    947                 batch_outs = [batch_outs]
+
+/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/keras/backend/tensorflow_backend.py in __call__(self, inputs)
+   1941         session = get_session()
+   1942         updated = session.run(self.outputs + [self.updates_op],
+-> 1943                               feed_dict=feed_dict)
+   1944         return updated[:len(self.outputs)]
+   1945 
+
+/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/tensorflow/python/client/session.py in run(self, fetches, feed_dict, options, run_metadata)
+    765     try:
+    766       result = self._run(None, fetches, feed_dict, options_ptr,
+--> 767                          run_metadata_ptr)
+    768       if run_metadata:
+    769         proto_data = tf_session.TF_GetBuffer(run_metadata_ptr)
+
+/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/tensorflow/python/client/session.py in _run(self, handle, fetches, feed_dict, options, run_metadata)
+    963     if final_fetches or final_targets:
+    964       results = self._do_run(handle, final_targets, final_fetches,
+--> 965                              feed_dict_string, options, run_metadata)
+    966     else:
+    967       results = []
+
+/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/tensorflow/python/client/session.py in _do_run(self, handle, target_list, fetch_list, feed_dict, options, run_metadata)
+   1013     if handle is None:
+   1014       return self._do_call(_run_fn, self._session, feed_dict, fetch_list,
+-> 1015                            target_list, options, run_metadata)
+   1016     else:
+   1017       return self._do_call(_prun_fn, self._session, handle, feed_dict,
+
+/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/tensorflow/python/client/session.py in _do_call(self, fn, *args)
+   1033         except KeyError:
+   1034           pass
+-> 1035       raise type(e)(node_def, op, message)
+   1036 
+   1037   def _extend_graph(self):
+
+FailedPreconditionError: Attempting to use uninitialized value convolution3d_1_W
+	 [[Node: convolution3d_1_W/read = Identity[T=DT_FLOAT, _class=["loc:@convolution3d_1_W"], _device="/job:localhost/replica:0/task:0/gpu:0"](convolution3d_1_W)]]
+	 [[Node: moments_2/sufficient_statistics/Gather/_17 = _Recv[client_terminated=false, recv_device="/job:localhost/replica:0/task:0/cpu:0", send_device="/job:localhost/replica:0/task:0/gpu:0", send_device_incarnation=1, tensor_name="edge_83_moments_2/sufficient_statistics/Gather", tensor_type=DT_FLOAT, _device="/job:localhost/replica:0/task:0/cpu:0"]()]]
+
+Caused by op 'convolution3d_1_W/read', defined at:
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/runpy.py", line 193, in _run_module_as_main
+    "__main__", mod_spec)
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/runpy.py", line 85, in _run_code
+    exec(code, run_globals)
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/ipykernel/__main__.py", line 3, in <module>
+    app.launch_new_instance()
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/traitlets/config/application.py", line 658, in launch_instance
+    app.start()
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/ipykernel/kernelapp.py", line 474, in start
+    ioloop.IOLoop.instance().start()
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/zmq/eventloop/ioloop.py", line 177, in start
+    super(ZMQIOLoop, self).start()
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/tornado/ioloop.py", line 887, in start
+    handler_func(fd_obj, events)
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/tornado/stack_context.py", line 275, in null_wrapper
+    return fn(*args, **kwargs)
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/zmq/eventloop/zmqstream.py", line 440, in _handle_events
+    self._handle_recv()
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/zmq/eventloop/zmqstream.py", line 472, in _handle_recv
+    self._run_callback(callback, msg)
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/zmq/eventloop/zmqstream.py", line 414, in _run_callback
+    callback(*args, **kwargs)
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/tornado/stack_context.py", line 275, in null_wrapper
+    return fn(*args, **kwargs)
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/ipykernel/kernelbase.py", line 276, in dispatcher
+    return self.dispatch_shell(stream, msg)
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/ipykernel/kernelbase.py", line 228, in dispatch_shell
+    handler(stream, idents, msg)
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/ipykernel/kernelbase.py", line 390, in execute_request
+    user_expressions, allow_stdin)
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/ipykernel/ipkernel.py", line 196, in do_execute
+    res = shell.run_cell(code, store_history=store_history, silent=silent)
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/ipykernel/zmqshell.py", line 501, in run_cell
+    return super(ZMQInteractiveShell, self).run_cell(*args, **kwargs)
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/IPython/core/interactiveshell.py", line 2717, in run_cell
+    interactivity=interactivity, compiler=compiler, result=result)
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/IPython/core/interactiveshell.py", line 2821, in run_ast_nodes
+    if self.run_code(code, result):
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/IPython/core/interactiveshell.py", line 2881, in run_code
+    exec(code_obj, self.user_global_ns, self.user_ns)
+  File "<ipython-input-22-98485586de88>", line 1, in <module>
+    model = load_model(path+'model.h5')
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/keras/models.py", line 142, in load_model
+    model = model_from_config(model_config, custom_objects=custom_objects)
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/keras/models.py", line 193, in model_from_config
+    return layer_from_config(config, custom_objects=custom_objects)
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/keras/utils/layer_utils.py", line 40, in layer_from_config
+    custom_objects=custom_objects)
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/keras/engine/topology.py", line 2582, in from_config
+    process_layer(layer_data)
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/keras/engine/topology.py", line 2577, in process_layer
+    layer(input_tensors[0])
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/keras/engine/topology.py", line 546, in __call__
+    self.build(input_shapes[0])
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/keras/layers/convolutional.py", line 1189, in build
+    constraint=self.W_constraint)
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/keras/engine/topology.py", line 418, in add_weight
+    weight = initializer(shape, name=name)
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/keras/initializations.py", line 66, in glorot_uniform
+    return uniform(shape, s, name=name)
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/keras/initializations.py", line 33, in uniform
+    return K.random_uniform_variable(shape, -scale, scale, name=name)
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/keras/backend/tensorflow_backend.py", line 635, in random_uniform_variable
+    return variable(value, dtype=dtype, name=name)
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/keras/backend/tensorflow_backend.py", line 259, in variable
+    v = tf.Variable(value, dtype=_convert_string_dtype(dtype), name=name)
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/tensorflow/python/ops/variables.py", line 226, in __init__
+    expected_shape=expected_shape)
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/tensorflow/python/ops/variables.py", line 344, in _init_from_args
+    self._snapshot = array_ops.identity(self._variable, name="read")
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/tensorflow/python/ops/gen_array_ops.py", line 1490, in identity
+    result = _op_def_lib.apply_op("Identity", input=input, name=name)
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/tensorflow/python/framework/op_def_library.py", line 763, in apply_op
+    op_def=op_def)
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/tensorflow/python/framework/ops.py", line 2395, in create_op
+    original_op=self._default_original_op, op_def=op_def)
+  File "/home/renjith/anaconda2/envs/python3/lib/python3.6/site-packages/tensorflow/python/framework/ops.py", line 1264, in __init__
+    self._traceback = _extract_stack()
+
+FailedPreconditionError (see above for traceback): Attempting to use uninitialized value convolution3d_1_W
+	 [[Node: convolution3d_1_W/read = Identity[T=DT_FLOAT, _class=["loc:@convolution3d_1_W"], _device="/job:localhost/replica:0/task:0/gpu:0"](convolution3d_1_W)]]
+	 [[Node: moments_2/sufficient_statistics/Gather/_17 = _Recv[client_terminated=false, recv_device="/job:localhost/replica:0/task:0/cpu:0", send_device="/job:localhost/replica:0/task:0/gpu:0", send_device_incarnation=1, tensor_name="edge_83_moments_2/sufficient_statistics/Gather", tensor_type=DT_FLOAT, _device="/job:localhost/replica:0/task:0/cpu:0"]()]]
+
+
+In [ ]:
+
+​
